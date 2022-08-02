@@ -52,7 +52,7 @@ def fetch(args):
 
     if args.patchset is None:
         # fetch all current ticket patchsets
-        print("Fetching ticket patchsets from the '{}' repository".format(args.remote))
+        print(f"Fetching ticket patchsets from the '{args.remote}' repository")
         if args.quiet:
             __call(['git', 'fetch', '-p', args.remote, '--quiet'])
         else:
@@ -60,7 +60,10 @@ def fetch(args):
     else:
         # fetch specific patchset
         __resolve_patchset(args)
-        print("Fetching ticket {} patchset {} from the '{}' repository".format(args.id, args.patchset, args.remote))
+        print(
+            f"Fetching ticket {args.id} patchset {args.patchset} from the '{args.remote}' repository"
+        )
+
         patchset_ref = 'refs/tickets/{:02d}/{:d}/{:d}'.format(args.id % 100, args.id, args.patchset)
         if args.quiet:
             __call(['git', 'fetch', args.remote, patchset_ref, '--quiet'])
@@ -98,16 +101,16 @@ def checkout(args):
     # ensure there are no local branch names that will interfere with branch creation
     if len(illegals) > 0:
         print('')
-        print('Sorry, can not complete the checkout for ticket {}.'.format(args.id))
-        print("The following branches are blocking '{}' branch creation:".format(branch))
+        print(f'Sorry, can not complete the checkout for ticket {args.id}.')
+        print(f"The following branches are blocking '{branch}' branch creation:")
         for illegal in illegals:
-            print('  ' + illegal)
+            print(f'  {illegal}')
         exit(errno.EINVAL)
 
     if args.patchset is None or args.patchset is 0:
         # checkout the current ticket patchset
         if args.force:
-            __call(['git', 'checkout', '-B', branch, '{}/{}'.format(args.remote, branch)])
+            __call(['git', 'checkout', '-B', branch, f'{args.remote}/{branch}'])
         else:
             __call(['git', 'checkout', branch])
     else:
@@ -132,11 +135,14 @@ def pull(args):
 
     # pull the patchset from the remote repository
     if args.patchset is None or args.patchset is 0:
-        print("Pulling ticket {} from the '{}' repository".format(args.id, args.remote))
+        print(f"Pulling ticket {args.id} from the '{args.remote}' repository")
         patchset_ref = 'ticket/{:d}'.format(args.id)
     else:
         __resolve_patchset(args)
-        print("Pulling ticket {} patchset {} from the '{}' repository".format(args.id, args.patchset, args.remote))
+        print(
+            f"Pulling ticket {args.id} patchset {args.patchset} from the '{args.remote}' repository"
+        )
+
         patchset_ref = 'refs/tickets/{:02d}/{:d}/{:d}'.format(args.id % 100, args.id, args.patchset)
 
     if args.squash:
@@ -157,16 +163,18 @@ def push(args):
     if args.id is None:
         # try to determine ticket and patchset from current branch name
         for line in __call(['git', 'status', '-b', '-s']):
-            if line[0:2] == '##':
+            if line[:2] == '##':
                 branch = line[2:].strip()
                 segments = branch.split('/')
-                if len(segments) >= 2:
-                    if segments[0] == 'ticket' or segments[0] == 'patchset':
-                        if '...' in segments[1]:
-                            args.id = int(segments[1][:segments[1].index('...')])
-                        else:
-                            args.id = int(segments[1])
-                        args.patchset = None
+                if len(segments) >= 2 and segments[0] in [
+                    'ticket',
+                    'patchset',
+                ]:
+                    if '...' in segments[1]:
+                        args.id = int(segments[1][:segments[1].index('...')])
+                    else:
+                        args.id = int(segments[1])
+                    args.patchset = None
 
     if args.id is None:
         print('Please specify a ticket id for the push command.')
@@ -177,15 +185,15 @@ def push(args):
 
     if args.force:
        # rewrite a patchset for an existing ticket
-        push_ref = 'refs/for/' + str(args.id)
+        push_ref = f'refs/for/{str(args.id)}'
     else:
         # fast-forward update to an existing patchset
         push_ref = 'refs/heads/ticket/{:d}'.format(args.id)
 
     ref_params = __get_pushref_params(args)
-    ref_spec = 'HEAD:' + push_ref + ref_params
+    ref_spec = f'HEAD:{push_ref}{ref_params}'
 
-    print("Pushing your patchset to the '{}' repository".format(args.remote))
+    print(f"Pushing your patchset to the '{args.remote}' repository")
     __call(['git', 'push', args.remote, ref_spec], echo=True)
     return
 
@@ -205,10 +213,10 @@ def start(args):
         else:
             branches.append(branch.strip())
 
-    branch = 'topic/' + args.topic
+    branch = f'topic/{args.topic}'
     try:
         int(args.topic)
-        branch = 'ticket/' + args.topic
+        branch = f'ticket/{args.topic}'
     except ValueError:
         pass
 
@@ -217,9 +225,9 @@ def start(args):
     # ensure there are no local branch names that will interfere with branch creation
     if len(illegals) > 0:
         print('Sorry, can not complete the creation of the topic branch.')
-        print("The following branches are blocking '{}' branch creation:".format(branch))
+        print(f"The following branches are blocking '{branch}' branch creation:")
         for illegal in illegals:
-            print('  ' + illegal)
+            print(f'  {illegal}')
         exit(errno.EINVAL)
 
     __call(['git', 'checkout', '-b', branch])
@@ -269,11 +277,14 @@ def propose(args):
         args.id = int(push_ref)
         args.patchset = __get_current_patchset(args.remote, args.id)
         if args.patchset > 0:
-            print('You can not propose a patchset for ticket {} because it already has one.'.format(args.id))
+            print(
+                f'You can not propose a patchset for ticket {args.id} because it already has one.'
+            )
+
 
             # check current branch for accidental propose instead of push
             for line in __call(['git', 'status', '-b', '-s']):
-                if line[0:2] == '##':
+                if line[:2] == '##':
                     branch = line[2:].strip()
                     segments = branch.split('/')
                     if len(segments) >= 2:
@@ -283,19 +294,19 @@ def propose(args):
                             else:
                                 args.id = int(segments[1])
                             args.patchset = None
-                            print("You are on the '{}' branch, perhaps you meant to push instead?".format(branch))
+                            print(f"You are on the '{branch}' branch, perhaps you meant to push instead?")
                         elif segments[0] == 'patchset':
                             args.id = int(segments[1])
                             args.patchset = int(segments[2])
-                            print("You are on the '{}' branch, perhaps you meant to push instead?".format(branch))
+                            print(f"You are on the '{branch}' branch, perhaps you meant to push instead?")
             exit(errno.EINVAL)
     except ValueError:
         pass
 
     ref_params = __get_pushref_params(args)
-    ref_spec = 'HEAD:refs/for/{}{}'.format(push_ref, ref_params)
+    ref_spec = f'HEAD:refs/for/{push_ref}{ref_params}'
 
-    print("Pushing your proposal to the '{}' repository".format(args.remote))
+    print(f"Pushing your proposal to the '{args.remote}' repository")
     for line in __call(['git', 'push', args.remote, ref_spec, '-q'], echo=True, err=subprocess.STDOUT):
         fields = line.split(':')
         if fields[0] == 'remote' and fields[1].strip().startswith('--> #'):
@@ -323,22 +334,25 @@ def cleanup(args):
         branches += __call(['git', 'branch', '--list', 'patchset/{:d}/*'.format(args.id)])
 
     if len(branches) == 0:
-        print("No local branches found for ticket {}, cleanup skipped.".format(args.id))
+        print(f"No local branches found for ticket {args.id}, cleanup skipped.")
         return
 
     if not args.force:
-        print('Cleanup would remove the following local branches for ticket {}.'.format(args.id))
+        print(
+            f'Cleanup would remove the following local branches for ticket {args.id}.'
+        )
+
         for branch in branches:
             if branch[0] == '*':
-                print('  ' + branch[1:].strip() + ' (skip)')
+                print(f'  {branch[1:].strip()} (skip)')
             else:
-                print('  ' + branch)
+                print(f'  {branch}')
         print("To discard these local branches, repeat this command with '--force'.")
         exit(errno.EINVAL)
 
     for branch in branches:
         if branch[0] == '*':
-            print('Skipped {} because it is the current branch.'.format(branch[1:].strip()))
+            print(f'Skipped {branch[1:].strip()} because it is the current branch.')
             continue
         __call(['git', 'branch', '-D', branch.strip()], echo=True)
 
@@ -355,13 +369,22 @@ def __resolve_uncommitted_changes_checkout(args):
     status = __call(['git', 'status', '--porcelain'])
     for line in status:
         if not args.force and line[0] != '?':
-            print('Your local changes to the following files would be overwritten by {}:'.format(args.command))
+            print(
+                f'Your local changes to the following files would be overwritten by {args.command}:'
+            )
+
             print('')
             for state in status:
                 print(state)
             print('')
-            print("To discard your local changes, repeat the {} with '--force'.".format(args.command))
-            print('NOTE: forcing a {} will HARD RESET your working directory!'.format(args.command))
+            print(
+                f"To discard your local changes, repeat the {args.command} with '--force'."
+            )
+
+            print(
+                f'NOTE: forcing a {args.command} will HARD RESET your working directory!'
+            )
+
             exit(errno.EINVAL)
 
 
@@ -380,7 +403,10 @@ def __resolve_uncommitted_changes_push(args):
             for state in status:
                 print(state)
             print('')
-            print("To ignore these uncommitted changes, repeat the {} with '--ignore'.".format(args.command))
+            print(
+                f"To ignore these uncommitted changes, repeat the {args.command} with '--ignore'."
+            )
+
             exit(errno.EINVAL)
 
 
@@ -411,7 +437,7 @@ def __resolve_remote(args):
             print("")
             print("Available remote repositories:")
             for remote in remotes:
-                print('  ' + remote)
+                print(f'  {remote}')
             print("")
             print("Please set the remote repository to use for patchsets.")
             print("  git config --local patchsets.remote <remote>")
@@ -420,11 +446,14 @@ def __resolve_remote(args):
             try:
                 remotes.index(preferred)
             except ValueError:
-                print("The '{}' repository specified in 'patchsets.remote' is not configured!".format(preferred))
+                print(
+                    f"The '{preferred}' repository specified in 'patchsets.remote' is not configured!"
+                )
+
                 print("")
                 print("Available remotes:")
                 for remote in remotes:
-                    print('  ' + remote)
+                    print(f'  {remote}')
                 print("")
                 print("Please set the remote repository to use for patchsets.")
                 print("  git config --local patchsets.remote <remote>")
@@ -446,7 +475,10 @@ def __resolve_patchset(args):
 
         if args.patchset == 0:
             # there are no patchsets for the ticket or the ticket does not exist
-            print("There are no patchsets for ticket {} in the '{}' repository".format(args.id, args.remote))
+            print(
+                f"There are no patchsets for ticket {args.id} in the '{args.remote}' repository"
+            )
+
             exit(errno.EINVAL)
     else:
         # validate specified patchset
@@ -454,7 +486,10 @@ def __resolve_patchset(args):
 
         if args.patchset == 0:
             # there are no patchsets for the ticket or the ticket does not exist
-            print("Patchset {} for ticket {} can not be found in the '{}' repository".format(args.patchset, args.id, args.remote))
+            print(
+                f"Patchset {args.patchset} for ticket {args.id} can not be found in the '{args.remote}' repository"
+            )
+
             exit(errno.EINVAL)
 
     return
@@ -474,9 +509,7 @@ def __validate_patchset(remote, ticket, patchset):
         if ps > nps:
             nps = ps
 
-    if nps == patchset:
-        return patchset
-    return 0
+    return patchset if nps == patchset else 0
 
 
 def __get_current_patchset(remote, ticket):
@@ -510,7 +543,7 @@ def __checkout(remote, ticket, patchset, branch, force=False):
 
     if branch is None or len(branch) == 0:
         # checkout the patchset on a detached head
-        print('Checking out ticket {} patchset {} on a detached HEAD'.format(ticket, patchset))
+        print(f'Checking out ticket {ticket} patchset {patchset} on a detached HEAD')
         __call(['git', 'checkout', 'FETCH_HEAD'], echo=True)
         return
     else:
@@ -527,7 +560,10 @@ def __checkout(remote, ticket, patchset, branch, force=False):
             if force:
                 # force the checkout the patchset to the new named branch
                 # used when there are local changes to discard
-                print("Forcing checkout of ticket {} patchset {} on named branch '{}'".format(ticket, patchset, branch))
+                print(
+                    f"Forcing checkout of ticket {ticket} patchset {patchset} on named branch '{branch}'"
+                )
+
                 __call(['git', 'checkout', '-b', branch, 'FETCH_HEAD', '--force'], echo=True)
             else:
                 # checkout the patchset to the new named branch
@@ -544,7 +580,10 @@ def __checkout(remote, ticket, patchset, branch, force=False):
 
         if force:
             # reset HEAD to FETCH_HEAD, this drops any local changes
-            print("Forcing checkout of ticket {} patchset {} on named branch '{}'".format(ticket, patchset, branch))
+            print(
+                f"Forcing checkout of ticket {ticket} patchset {patchset} on named branch '{branch}'"
+            )
+
             __call(['git', 'reset', '--hard', 'FETCH_HEAD'], echo=True)
             return
         else:
@@ -556,7 +595,10 @@ def __checkout(remote, ticket, patchset, branch, force=False):
                     return
             elif len(merge) is 0:
                 print('')
-                print("Your '{}' branch has diverged from patchset {} on the '{}' repository.".format(branch, patchset, remote))
+                print(
+                    f"Your '{branch}' branch has diverged from patchset {patchset} on the '{remote}' repository."
+                )
+
                 print('')
                 print("To discard your local changes, repeat the checkout with '--force'.")
                 print('NOTE: forcing a checkout will HARD RESET your working directory!')
@@ -574,10 +616,10 @@ def __get_pushref_params(args):
     params = []
 
     if args.milestone is not None:
-        params.append('m=' + args.milestone)
+        params.append(f'm={args.milestone}')
 
     if args.topic is not None:
-        params.append('t=' + args.topic)
+        params.append(f't={args.topic}')
     else:
         for branch in __call(['git', 'branch']):
             if branch[0] == '*':
@@ -589,19 +631,14 @@ def __get_pushref_params(args):
                         int(topic)
                     except:
                         # topic is a string
-                        params.append('t=' + topic)
+                        params.append(f't={topic}')
 
     if args.responsible is not None:
-        params.append('r=' + args.responsible)
+        params.append(f'r={args.responsible}')
 
     if args.cc is not None:
-        for cc in args.cc:
-            params.append('cc=' + cc)
-
-    if len(params) > 0:
-        return '%' + ','.join(params)
-
-    return ''
+        params.extend(f'cc={cc}' for cc in args.cc)
+    return '%' + ','.join(params) if params else ''
 
 
 def __call(cmd_args, echo=False, fail=True, err=None):
@@ -655,7 +692,10 @@ push_args.add_argument('-cc', nargs='+', help='specify accounts to add to the wa
 
 # the commands
 parser = argparse.ArgumentParser(description='a Patchset Tool for Gitblit Tickets')
-parser.add_argument('--version', action='version', version='%(prog)s {}'.format(__version__))
+parser.add_argument(
+    '--version', action='version', version=f'%(prog)s {__version__}'
+)
+
 commands = parser.add_subparsers(dest='command', title='commands')
 
 fetch_parser = commands.add_parser('fetch', help='fetch a patchset', parents=[ticket_args, quiet_arg])
